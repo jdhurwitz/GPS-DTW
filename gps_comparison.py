@@ -39,6 +39,7 @@ class GPS_Comparison:
 			lookup_dir = source_dir + type + '/' + file
 			xmldoc = minidom.parse(lookup_dir)
 
+			data_samples = xmldoc.getElementsByTagName("trkpt")
    
 			list_to_append = []
 			#determine if apple
