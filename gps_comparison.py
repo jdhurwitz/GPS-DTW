@@ -67,21 +67,33 @@ class GPS_Comparison:
 
 			#determine if apple
 			if file[0:2] == 'aw':
-				e.deviceUsed = "aw"
+				e.deviceUsed = "AW S5"
 				for sample in data_samples:
 					e.addTuple(self.extractLatLon(sample))
-#					list_to_append.append(self.extractLatLon(sample))
-
 				self.datasets[etype][0].append(e)
 
 			#determine if SS
 			elif file[0:2] == 'ss':
-				e.deviceUsed = "ss"
+				e.deviceUsed = "Active 2"
 				for sample in data_samples:
 					e.addTuple(self.extractLatLon(sample))
-#					list_to_append.append(self.extractLatLon(sample))	
-
 				self.datasets[etype][1].append(e)
+
+
+			#dirty hard coding for garmin edge
+			elif file[0:2] == 'ed': #garmin edge
+				e.deviceUsed = "Garmin Edge 1030"
+				for sample in data_samples:
+					e.addTuple(self.extractLatLon(sample))
+				self.datasets[etype][0].append(e)
+
+			#dirty hard coding to compare garmin to garmin
+			elif file[0:2] == 'fn': #garmin fenix 5
+				e.deviceUsed = "Garmin Fenix 5"
+				for sample in data_samples:
+					e.addTuple(self.extractLatLon(sample))
+				self.datasets[etype][1].append(e)
+
 
 	def importData(self, dir=source_dir):
 		#find both AW and SS data in directory
