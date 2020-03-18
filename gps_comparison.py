@@ -6,16 +6,36 @@ from xml.dom import minidom
 
 from os.path import isfile, join
 from fastdtw import fastdtw
+import json
 
 source_dir = "/Users/jdhurwitz/Documents/coding/GPS_comparison/data/"
 
+class exercise:
+	def __init__(self, eetype, date, filename):
+		self.etype = eetype
+		self.date = date
+		self.latLonSamples = []
+		self.deviceUsed = ""
+		self.filename = filename
+
+	def updateetype(self, eetype):
+		self.etype = eetype
+
+	def updateDate(self, date):
+		self.date = date
+
+	def addTuple(self, latlonTuple):
+		self.latLonSamples.append(latlonTuple)
+
+
+
 class GPS_Comparison:
 	def __init__(self):
-		#declare empty dict to use as hash for type -> tuple(AW, SS)
+		#declare empty dict to use as hash for etype -> tuple(AW, SS)
 		self.datasets = {
-		'run': ([],[]),
-		'walk': ([],[]),
-		'bike': ([], [])
+		'run': [[], []],
+		'walk': [[], []],
+		'bike': [[], []]
 		}
 
 		self.dtwOutputs = { #store dtw distance outputs in this hash. 
@@ -28,33 +48,40 @@ class GPS_Comparison:
 		lon = sample.attributes['lon'].value
 		return (lat, lon)
 
-	def parseAndStore(self, type, filepath):
+	def parseAndStore(self, etype, filepath):
 		#Identify if the file is AW or SS, then parse accordingly and append to a the 
-		#set that mmatches type
+		#set that mmatches etype
 
 		files_in_dir = [f for f in os.listdir(filepath) if isfile(join(filepath, f)) and f != '.DS_Store']
 		for file in files_in_dir:
 			#build xml tree
 #			print(file)
-			lookup_dir = source_dir + type + '/' + file
+			event_date = file[3:9] #pull the date of the filename
+			lookup_dir = source_dir + etype + '/' + file
 			xmldoc = minidom.parse(lookup_dir)
 
+			e = exercise(etype, event_date, file)
+
 			data_samples = xmldoc.getElementsByTagName("trkpt")
-   
-			list_to_append = []
+
+
 			#determine if apple
 			if file[0:2] == 'aw':
+				e.deviceUsed = "aw"
 				for sample in data_samples:
-					list_to_append.append(self.extractLatLon(sample))
+					e.addTuple(self.extractLatLon(sample))
+#					list_to_append.append(self.extractLatLon(sample))
 
-				self.datasets[type][0].append(list_to_append)
+				self.datasets[etype][0].append(e)
 
 			#determine if SS
 			elif file[0:2] == 'ss':
+				e.deviceUsed = "ss"
 				for sample in data_samples:
-					list_to_append.append(self.extractLatLon(sample))	
+					e.addTuple(self.extractLatLon(sample))
+#					list_to_append.append(self.extractLatLon(sample))	
 
-				self.datasets[type][1].append(list_to_append)
+				self.datasets[etype][1].append(e)
 
 	def importData(self, dir=source_dir):
 		#find both AW and SS data in directory
@@ -64,14 +91,18 @@ class GPS_Comparison:
 				continue
 			elif folder == 'run': 
 				r_dir = source_dir + 'run'
-				self.parseAndStore(type='run', filepath=r_dir)
+				self.parseAndStore(etype='run', filepath=r_dir)
 			elif folder  == 'walk':
 				w_dir = source_dir + 'walk'
-				self.parseAndStore(type='walk', filepath=w_dir)
+				self.parseAndStore(etype='walk', filepath=w_dir)
 			elif folder  == 'bike':
 				b_dir = source_dir + 'bike'
-				self.parseAndStore(type='bike', filepath=b_dir)
+				self.parseAndStore(etype='bike', filepath=b_dir)
 
+	def findExerciseByDate(self, exerciseList, date):
+		for e in exerciseList:
+			if e.date == date:
+				return e
 
 
 
@@ -80,8 +111,10 @@ class GPS_Comparison:
 		distance, path = fastdtw(series1, series2, dist=euclidean)
 		return distance, path
 
+
 	def runAllDtw(self):
-		#go through all dataset types in dataset dict
+		#go through all dataset etypes in dataset dict
+
 		for key in self.datasets:
 			#check to see if size of series for ss and aw are equal
 			if len(self.datasets[key][0]) == len(self.datasets[key][1]):
@@ -91,12 +124,25 @@ class GPS_Comparison:
 
 			num_series = len(self.datasets[key][0])
 			for i in range(num_series):
-				#get aw and ss series
-				aw_series = self.datasets[key][0][i]
-				ss_series = self.datasets[key][1][i]
+				first_dataset = self.datasets[key][0][i]
+				second_dataset = self.findExerciseByDate(self.datasets[key][1], first_dataset.date)
+
+				date = first_dataset.date
+
+				aw_series = first_dataset.latLonSamples
+				ss_series = second_dataset.latLonSamples
 
 				distance, path = self.applyDtw(aw_series, ss_series)
-				self.dtwOutputs[key].append(distance)
+
+				result_tuple = (date, distance)
+				self.dtwOutputs[key].append(result_tuple)
+
+
+	def printOutputs(self, lineByline=False):
+		if lineByline:
+			print(json.dumps(self.dtwOutputs, indent=4))
+		else:
+			print(self.dtwOutputs)
 
 
 if __name__ == "__main__":
@@ -105,8 +151,7 @@ if __name__ == "__main__":
 	c.importData()
 	c.runAllDtw()
 
-#	print(len(c.datasets['run']))
-	print(c.dtwOutputs)
+	c.printOutputs(lineByline=True)
 
 
 
